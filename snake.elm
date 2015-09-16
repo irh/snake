@@ -61,6 +61,7 @@ type alias Game =
   , length : Int
   , food : Point
   , seed : Seed
+  , score : Int
   }
 
 type Update =
@@ -94,6 +95,7 @@ defaultGame =
   , length = 2
   , food = defaultPoint
   , seed = initialSeed 420
+  , score = 0
   }
 
 
@@ -173,8 +175,8 @@ tickDead game count =
 moveSnake : Game -> Game
 moveSnake game =
   let
-    direction = changeDirection game
-    newHead = moveHead game direction
+    newDirection = changeDirection game
+    newHead = moveHead game newDirection
   in
     if collisionTest newHead game.snake then
       { game | state <- Dead 0 }
@@ -182,12 +184,14 @@ moveSnake game =
       let
         newSnake = (newHead :: game.snake)
         foodEaten = collisionTest game.food newSnake
-        length = if foodEaten then (game.length + foodEnergy) else game.length
+        newLength = if foodEaten then (game.length + foodEnergy) else game.length
+        newScore = if foodEaten then (game.score + 1) else game.score
         result =
           { game
-          | snake <- List.take length newSnake
-          , direction <- direction
-          , length <- length
+          | snake <- List.take newLength newSnake
+          , direction <- newDirection
+          , length <- newLength
+          , score <- newScore
           }
       in
         Debug.watchSummary "result" (\_ -> result.food) <|
@@ -259,14 +263,25 @@ view (w, h) game =
     width = gameWidth * cellSize
     height = gameHeight * cellSize
     background = rect width height |> filled backColor
+    score = toString game.score
+      |> styledText
+      |> move ((toFloat width / 2 - 30), (toFloat height / 2 - 20))
   in
     container w h middle <|
       collage width height
       (case game.state of
         NewGame -> (background :: gameText game)
-        Pause -> (background :: gameText game)
-        GameOver -> (background :: gameText game)
-        _ -> (background :: gameLayer width height game))
+        Pause -> (background :: score :: gameText game)
+        GameOver -> (background :: score :: gameText game)
+        _ -> (List.concat [[background], gameLayer width height game, [score]])
+      )
+
+
+styledText : String -> Form
+styledText string =
+  Text.fromString string
+  |> Text.style textStyle
+  |> Graphics.Collage.text
 
 
 gameText : Game -> List Form
@@ -277,13 +292,9 @@ gameText game =
     GameOver -> ("GAME OVER", "PRESS SPACE TO RETRY")
     _ -> ("", "")
   in
-    [ Text.fromString first
-      |> Text.style textStyle
-      |> Graphics.Collage.text
+    [ styledText first
       |> move (0, textHeight)
-    , Text.fromString second
-      |> Text.style textStyle
-      |> Graphics.Collage.text
+    , styledText second
       |> move (0, -textHeight)
     ]
 
