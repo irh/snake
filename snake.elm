@@ -19,6 +19,7 @@ foodEnergy = 4
 
 backColor = rgb 0 100 0
 liveColor = rgb 100 200 100
+headColor = rgb 60 160 60
 deadColor = rgb 100 150 100
 foodColor = rgb 200 200 100
 
@@ -163,12 +164,24 @@ moveSnake game =
         if foodEaten then (result |> newFood) else result
 
 
+getHead : Game -> Point
+getHead game =
+  case List.head game.snake of
+    Just (point) -> point
+    Nothing -> defaultPoint
+
+
+getTail : Game -> List Point
+getTail game =
+  case List.tail game.snake of
+    Just (tail) -> tail
+    Nothing -> []
+
+
 moveHead : Game -> Direction -> Point
 moveHead game direction =
   let
-    oldHead = case List.head game.snake of
-      Just (point) -> point
-      Nothing -> defaultPoint
+    oldHead = getHead game
     newHead = case direction of
       Up    -> { oldHead | y <- oldHead.y - 1 }
       Right -> { oldHead | x <- oldHead.x + 1 }
@@ -217,13 +230,17 @@ view (w, h) game =
     height = gameHeight * cellSize
     background = rect width height |> filled backColor
     food = makeCell game.food width height foodColor
+    head = makeCell (getHead game) width height headColor
     snakeColor = if game.state == Dead then deadColor else liveColor
-    snake = List.map (\point -> makeCell point width height snakeColor) game.snake
+    snake = List.map
+      (\point -> makeCell point width height snakeColor)
+      (getTail game)
   in
     container w h middle <|
       collage width height
       (background
       :: food
+      :: head
       :: snake
       )
 
