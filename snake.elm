@@ -18,15 +18,21 @@ cellSize = 16
 foodEnergy = 4
 
 backColor = rgb 0 100 0
-liveColor = rgb 100 200 100
+snakeColor = rgb 100 200 100
 headColor = rgb 60 160 60
-deadColor = rgb 100 150 100
 foodColor = rgb 200 200 100
+
+tickFps = 20
 
 
 -- Model
 
-type State = Play | Dead | Pause
+type State =
+  NewGame
+  | Play
+  | Pause
+  | Dead Int
+  | GameOver
 
 type Direction = Up | Right | Down | Left
 
@@ -49,7 +55,6 @@ type Update =
   | Space Bool
 
 
-
 -- Update
 
 defaultPoint : Point
@@ -67,7 +72,7 @@ randomPoint seed =
 
 defaultGame : Game
 defaultGame =
-  { state = Pause
+  { state = NewGame
   , direction = Right
   , arrows = defaultPoint
   , snake = [ { x = gameWidth // 2, y = gameHeight // 2 } ]
@@ -79,7 +84,7 @@ defaultGame =
 
 gameOver : Game -> Game
 gameOver game =
-  { game | state <- Dead }
+  { game | state <- Dead 0 }
 
 
 newGame : Game -> Game
@@ -121,24 +126,36 @@ update input game =
   case input of
     Reset -> newGame game
     Arrows (arrows) -> { game | arrows <- arrows }
-    Tick (f) -> tickGame game
+    Tick _ -> tickGame game
     Space (down) -> if down then changeGameState game else game
 
 
 changeGameState : Game -> Game
 changeGameState game =
   case game.state of
+    NewGame -> { game | state <- Play }
     Play -> { game | state <- Pause }
     Pause -> { game | state <- Play }
-    Dead -> newGame game
+    Dead _ -> game
+    GameOver -> newGame game
 
 
 tickGame : Game -> Game
 tickGame game =
   case game.state of
+    NewGame -> game
     Play -> moveSnake game
     Pause -> game
-    Dead -> game
+    Dead (count) -> tickDead game count
+    GameOver -> game
+
+
+tickDead : Game -> Int -> Game
+tickDead game count =
+  if count == tickFps * 2 then
+    { game | state <- GameOver }
+  else
+    { game | state <- Dead (count + 1) }
 
 
 moveSnake : Game -> Game
@@ -231,16 +248,17 @@ view (w, h) game =
     background = rect width height |> filled backColor
     food = makeCell game.food width height foodColor
     head = makeCell (getHead game) width height headColor
-    snakeColor = if game.state == Dead then deadColor else liveColor
-    snake = List.map
+    tail = List.map
       (\point -> makeCell point width height snakeColor)
       (getTail game)
+    snake = case game.state of
+      Dead (count) -> if (count % 16 >= 8) then (head :: tail) else []
+      _ -> (head :: tail)
   in
     container w h middle <|
       collage width height
       (background
       :: food
-      :: head
       :: snake
       )
 
@@ -262,7 +280,7 @@ makeCell point width height color =
 updateSignal : Signal Update
 updateSignal =
   Signal.mergeMany
-  [ Signal.map Tick (fps 20)
+  [ Signal.map Tick (fps tickFps)
   , Signal.map Arrows Keyboard.arrows
   , Signal.map Space Keyboard.space
   ]
