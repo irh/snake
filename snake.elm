@@ -24,6 +24,8 @@ foodColor = rgb 200 200 100
 textColor = rgb 250 250 150
 
 tickFps = 20
+deathTicks = 32
+deathFlashCount = deathTicks // 4
 
 
 -- Model
@@ -147,10 +149,13 @@ tickGame game =
 
 tickDead : Game -> Int -> Game
 tickDead game count =
-  if count == 48 then
-    { game | state <- GameOver }
-  else
-    { game | state <- Dead (count + 1) }
+  let
+    nextCount = count + 1
+  in
+    if nextCount == deathTicks then
+      { game | state <- GameOver }
+    else
+      { game | state <- Dead nextCount }
 
 
 moveSnake : Game -> Game
@@ -276,7 +281,11 @@ gameLayer width height game =
       (\point -> makeCell point width height snakeColor)
       (getTail game)
     snake = case game.state of
-      Dead (count) -> if (count % 16 >= 8) then (head :: tail) else []
+      Dead (count) ->
+        if (count % (deathFlashCount * 2) >= deathFlashCount) then
+          (head :: tail)
+        else
+          []
       _ -> (head :: tail)
   in
     food :: snake
