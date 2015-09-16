@@ -27,6 +27,18 @@ tickFps = 20
 deathTicks = 32
 deathFlashCount = deathTicks // 4
 
+textHeight = 30
+
+textStyle : Text.Style
+textStyle =
+  { typeface = [ "monospace" ]
+  , height   = Just textHeight
+  , color    = textColor
+  , bold     = True
+  , italic   = False
+  , line     = Nothing
+  }
+
 
 -- Model
 
@@ -251,25 +263,29 @@ view (w, h) game =
     container w h middle <|
       collage width height
       (case game.state of
-        NewGame -> (background :: newGameText game)
-        GameOver -> (background :: newGameText game)
+        NewGame -> (background :: gameText game)
+        Pause -> (background :: gameText game)
+        GameOver -> (background :: gameText game)
         _ -> (background :: gameLayer width height game))
 
 
-newGameText : Game -> List Form
-newGameText game =
-  let string = case game.state of
-    NewGame -> "SNAKE"
-    GameOver -> "GAME OVER"
-    _ -> ""
+gameText : Game -> List Form
+gameText game =
+  let (first, second) = case game.state of
+    NewGame -> ("SNAKE", "PRESS SPACE TO PLAY")
+    Pause -> ("PAUSED", "PRESS SPACE TO CONTINUE")
+    GameOver -> ("GAME OVER", "PRESS SPACE TO RETRY")
+    _ -> ("", "")
   in
-    (Text.fromString string
-    |> Text.monospace
-    |> Text.height 30
-    |> Text.color textColor
-    |> Text.bold
-    |> Graphics.Collage.text)
-    :: []
+    [ Text.fromString first
+      |> Text.style textStyle
+      |> Graphics.Collage.text
+      |> move (0, textHeight)
+    , Text.fromString second
+      |> Text.style textStyle
+      |> Graphics.Collage.text
+      |> move (0, -textHeight)
+    ]
 
 
 gameLayer : Int -> Int -> Game -> List Form
