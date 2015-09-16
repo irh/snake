@@ -21,6 +21,7 @@ backColor = rgb 0 100 0
 snakeColor = rgb 100 200 100
 headColor = rgb 60 160 60
 foodColor = rgb 200 200 100
+textColor = rgb 250 250 150
 
 tickFps = 20
 
@@ -82,11 +83,6 @@ defaultGame =
   }
 
 
-gameOver : Game -> Game
-gameOver game =
-  { game | state <- Dead 0 }
-
-
 newGame : Game -> Game
 newGame game =
   { defaultGame
@@ -133,7 +129,7 @@ update input game =
 changeGameState : Game -> Game
 changeGameState game =
   case game.state of
-    NewGame -> { game | state <- Play }
+    NewGame -> newGame game
     Play -> { game | state <- Pause }
     Pause -> { game | state <- Play }
     Dead _ -> game
@@ -142,17 +138,16 @@ changeGameState game =
 
 tickGame : Game -> Game
 tickGame game =
+  Debug.watchSummary "game" (\_ -> game.state) <|
   case game.state of
-    NewGame -> game
     Play -> moveSnake game
-    Pause -> game
     Dead (count) -> tickDead game count
-    GameOver -> game
+    _ -> game
 
 
 tickDead : Game -> Int -> Game
 tickDead game count =
-  if count == tickFps * 2 then
+  if count == 48 then
     { game | state <- GameOver }
   else
     { game | state <- Dead (count + 1) }
@@ -164,7 +159,8 @@ moveSnake game =
     direction = changeDirection game
     newHead = moveHead game direction
   in
-    if collisionTest newHead game.snake then gameOver game
+    if collisionTest newHead game.snake then
+      { game | state <- Dead 0 }
     else
       let
         newSnake = (newHead :: game.snake)
@@ -246,6 +242,34 @@ view (w, h) game =
     width = gameWidth * cellSize
     height = gameHeight * cellSize
     background = rect width height |> filled backColor
+  in
+    container w h middle <|
+      collage width height
+      (case game.state of
+        NewGame -> (background :: newGameText game)
+        GameOver -> (background :: newGameText game)
+        _ -> (background :: gameLayer width height game))
+
+
+newGameText : Game -> List Form
+newGameText game =
+  let string = case game.state of
+    NewGame -> "SNAKE"
+    GameOver -> "GAME OVER"
+    _ -> ""
+  in
+    (Text.fromString string
+    |> Text.monospace
+    |> Text.height 30
+    |> Text.color textColor
+    |> Text.bold
+    |> Graphics.Collage.text)
+    :: []
+
+
+gameLayer : Int -> Int -> Game -> List Form
+gameLayer width height game =
+  let
     food = makeCell game.food width height foodColor
     head = makeCell (getHead game) width height headColor
     tail = List.map
@@ -255,12 +279,7 @@ view (w, h) game =
       Dead (count) -> if (count % 16 >= 8) then (head :: tail) else []
       _ -> (head :: tail)
   in
-    container w h middle <|
-      collage width height
-      (background
-      :: food
-      :: snake
-      )
+    food :: snake
 
 
 makeCell : Point -> Int -> Int -> Color -> Form
