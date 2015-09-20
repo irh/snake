@@ -1,53 +1,24 @@
-import Color exposing (..)
+module Snake where
+
 import Debug
-import Graphics.Collage exposing (..)
-import Graphics.Element exposing (..)
-import Keyboard
-import Random exposing (..)
-import Text
-import Time exposing (..)
-import Trampoline exposing (..)
-import Window
+import Random exposing(Seed)
+import Trampoline
 
-
--- Values
 
 (gameWidth, gameHeight) = (48, 27)
-cellSize = 16
 
 foodEnergy = 4
 foodScore = 1
 bonusScore = 5
 
-backColor = rgb 0 100 0
-snakeColor = rgb 100 200 100
-headColor = rgb 60 160 60
-foodColor = rgb 200 200 100
-bonusColor = rgb 220 100 50
-textColor = rgb 250 250 150
-
 tickFps = 20
 deathTicks = 32
 deathFlashCount = deathTicks // 4
 
-activeBonusTicks = 60
+activeBonusTicks = 50
 minTicksToNextBonus = 200
 maxTicksToNextBonus = 400
 
-textHeight = 30
-
-textStyle : Color -> Text.Style
-textStyle color =
-  { typeface = [ "monospace" ]
-  , height = Just textHeight
-  , color = color
-  , bold = True
-  , italic = False
-  , line = Nothing
-  }
-
-
--- Model
 
 type Mode =
   NewGame
@@ -84,8 +55,6 @@ type Update =
   | Space Bool
 
 
--- Update
-
 defaultPoint : Point
 defaultPoint = { x = 0, y = 0 }
 
@@ -103,7 +72,7 @@ defaultGame =
   , length = 2
   , food = defaultPoint
   , bonus = defaultBonus
-  , seed = initialSeed 420
+  , seed = Random.initialSeed 420
   , score = 0
   }
 
@@ -131,8 +100,8 @@ collisionTest testPoint candidates =
 randomPoint : Seed -> (Point, Seed)
 randomPoint seed =
   let
-    (x, seed0) = generate (Random.int 0 (gameWidth - 1)) seed
-    (y, seed1) = generate (Random.int 0 (gameHeight - 1)) seed0
+    (x, seed0) = Random.generate (Random.int 0 (gameWidth - 1)) seed
+    (y, seed1) = Random.generate (Random.int 0 (gameHeight - 1)) seed0
   in
     ({x = x, y = y}, seed1)
 
@@ -148,10 +117,10 @@ newFood game =
         Nothing -> False
     in
       if bonusCollision || collisionTest food game.snake then
-        Continue (\() -> newFood' game')
+        Trampoline.Continue (\() -> newFood' game')
       else
-        Done game'
-  in trampoline (newFood' game)
+        Trampoline.Done game'
+  in Trampoline.trampoline (newFood' game)
 
 
 newBonus : Model -> Model
@@ -170,17 +139,17 @@ newBonus game =
       foodCollision = bonus == game.food
     in
       if foodCollision || collisionTest bonus game.snake then
-        Continue (\() -> newBonus' game')
+        Trampoline.Continue (\() -> newBonus' game')
       else
-        Done game'
-  in trampoline (newBonus' game)
+        Trampoline.Done game'
+  in Trampoline.trampoline (newBonus' game)
 
 
 resetBonus : Model -> Model
 resetBonus game =
   let
     (ticks, seed') =
-      generate (Random.int minTicksToNextBonus maxTicksToNextBonus) game.seed
+      Random.generate (Random.int minTicksToNextBonus maxTicksToNextBonus) game.seed
   in
     { game
     | seed <- seed'
@@ -347,114 +316,3 @@ changeDirection game =
     else if y < 0 && game.direction /= Down then Up
     else if y > 0 && game.direction /= Up then Down
     else game.direction
-
-
--- View
-
-view : (Int, Int) -> Model -> Element
-view (w, h) game =
-  let
-    width = gameWidth * cellSize
-    height = gameHeight * cellSize
-    background = rect width height
-      |> filled backColor
-    score = toString game.score
-      |> styledText textColor
-      |> move ((toFloat width / 2 - 30), (toFloat height / 2 - 20))
-    bonusString = case game.bonus.point of
-      Just _ ->
-        let x = activeBonusTicks // 10
-        in toString ((game.bonus.ticks + x - 1) // x)
-      Nothing -> ""
-    bonus = bonusString
-      |> styledText bonusColor
-      |> move ((toFloat 30 - width / 2), (toFloat height / 2 - 20))
-  in
-    container w h middle <|
-      collage width height
-      (case game.mode of
-        NewGame -> (background :: gameText game)
-        Pause -> (background :: score :: gameText game)
-        GameOver -> (background :: score :: gameText game)
-        _ -> (List.concat [[background], gameLayer width height game, [score, bonus]])
-      )
-
-
-styledText : Color -> String -> Form
-styledText color string =
-  Text.fromString string
-  |> Text.style ( textStyle color )
-  |> Graphics.Collage.text
-
-
-gameText : Model -> List Form
-gameText game =
-  let (first, second) = case game.mode of
-    NewGame -> ("SNAKE", "PRESS SPACE TO PLAY")
-    Pause -> ("PAUSED", "PRESS SPACE TO CONTINUE")
-    GameOver -> ("GAME OVER", "PRESS SPACE TO RETRY")
-    _ -> ("", "")
-  in
-    [ styledText textColor first
-      |> move (0, textHeight)
-    , styledText textColor second
-      |> move (0, -textHeight)
-    ]
-
-
-gameLayer : Int -> Int -> Model -> List Form
-gameLayer width height game =
-  let
-    food = makeCell game.food width height foodColor
-    bonus = case game.bonus.point of
-      Just bonusPoint -> Just (makeCell bonusPoint width height bonusColor)
-      Nothing -> Nothing
-    head = makeCell (getHead game) width height headColor
-    tail = List.map
-      (\point -> makeCell point width height snakeColor)
-      (getTail game)
-    snake = case game.mode of
-      Dead (count) ->
-        if (count % (deathFlashCount * 2) >= deathFlashCount) then
-          (head :: tail)
-        else
-          []
-      _ -> (head :: tail)
-  in
-    case bonus of
-      Just bonusCell -> food :: bonusCell :: snake
-      Nothing -> food :: snake
-
-
-makeCell : Point -> Int -> Int -> Color -> Form
-makeCell point width height color =
-  let
-    offset = toFloat cellSize / 2
-    x' = toFloat width / 2 - offset
-    y' = toFloat height / 2 - offset
-  in
-    rect cellSize cellSize
-      |> filled color
-      |> move (toFloat point.x * cellSize - x', toFloat point.y * cellSize - y')
-
-
--- Signals
-
-updateSignal : Signal Update
-updateSignal =
-  Signal.mergeMany
-  [ Signal.map Tick (fps tickFps)
-  , Signal.map Arrows Keyboard.arrows
-  , Signal.map Space Keyboard.space
-  ]
-
-
-gameSignal : Signal Model
-gameSignal =
-  Signal.foldp update initialGame updateSignal
-
-
-main : Signal Element
-main =
-  Signal.map2 view Window.dimensions gameSignal
-
