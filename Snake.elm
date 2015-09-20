@@ -195,6 +195,7 @@ collisionTest testPoint candidates =
 
 tickGame : Model -> Model
 tickGame game =
+  Debug.watch "Game" <|
   case game.mode of
     Play -> tickPlay game
     Dead count -> tickDead game count
@@ -291,9 +292,9 @@ moveHead game direction =
   let
     oldHead = getHead game
     newHead = case direction of
-      Up -> { oldHead | y <- oldHead.y - 1 }
+      Up -> { oldHead | y <- oldHead.y + 1 }
       Right -> { oldHead | x <- oldHead.x + 1 }
-      Down -> { oldHead | y <- oldHead.y + 1 }
+      Down -> { oldHead | y <- oldHead.y - 1 }
       Left -> { oldHead | x <- oldHead.x - 1 }
   in
     wrapPoint newHead
@@ -324,6 +325,6 @@ changeDirection game =
   in
     if | x > 0 && game.direction /= Left -> Right
        | x < 0 && game.direction /= Right -> Left
-       | y < 0 && game.direction /= Down -> Up
-       | y > 0 && game.direction /= Up -> Down
+       | y > 0 && game.direction /= Down -> Up
+       | y < 0 && game.direction /= Up -> Down
        | otherwise -> game.direction
