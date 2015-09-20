@@ -20,6 +20,14 @@ minTicksToNextBonus = 200
 maxTicksToNextBonus = 400
 
 
+type Update =
+  Reset
+  | Arrows Point
+  | Wasd Point
+  | Tick Float
+  | Space Bool
+  | StartTime Float
+
 type Mode =
   NewGame
   | Play
@@ -47,14 +55,6 @@ type alias Model =
   , seed : Seed
   , score : Int
   }
-
-type Update =
-  Reset
-  | Arrows Point
-  | Wasd Point
-  | Tick Float
-  | Space Bool
-  | StartTime Float
 
 
 defaultPoint : Point
@@ -89,9 +89,35 @@ newGame game =
   |> resetBonus
 
 
-collisionTest : Point -> List Point -> Bool
-collisionTest testPoint candidates =
-  List.any (\point -> testPoint == point) candidates
+initialGame : Update -> Model
+initialGame input =
+  case input of
+    StartTime time ->
+      { defaultGame | seed <- Random.initialSeed (round time) }
+      |> newFood
+      |> resetBonus
+    _ -> defaultGame
+
+
+updateGame : Update -> Model -> Model
+updateGame input game =
+  case input of
+    Reset -> newGame game
+    Arrows arrows -> { game | arrows <- arrows }
+    Wasd wasd -> { game | arrows <- wasd }
+    Tick _ -> tickGame game
+    Space down -> if down then changeGameMode game else game
+    _ -> game
+
+
+changeGameMode : Model -> Model
+changeGameMode game =
+  case game.mode of
+    NewGame -> newGame game
+    Play -> { game | mode <- Pause }
+    Pause -> { game | mode <- Play }
+    Dead _ -> game
+    GameOver -> newGame game
 
 
 randomInt : Int -> Int -> Seed -> (Int, Seed)
@@ -119,7 +145,7 @@ newFood game =
         Nothing -> False
     in
       if bonusCollision || collisionTest food game.snake then
-        Trampoline.Continue (\() -> newFood' game')
+        Trampoline.Continue (\_ -> newFood' game')
       else
         Trampoline.Done game'
   in Trampoline.trampoline (newFood' game)
@@ -129,19 +155,13 @@ newBonus : Model -> Model
 newBonus game =
   let newBonus' game =
     let
-      (bonus, seed) = randomPoint game.seed
-      game' =
-        { game
-        | seed <- seed
-        , bonus <-
-          { point = Just bonus
-          , ticks = activeBonusTicks
-          }
-        }
-      foodCollision = bonus == game.food
+      (bonusPoint, seed) = randomPoint game.seed
+      bonus' = { point = Just bonusPoint, ticks = activeBonusTicks }
+      game' = { game | seed <- seed , bonus <- bonus' }
+      foodCollision = bonusPoint == game.food
     in
-      if foodCollision || collisionTest bonus game.snake then
-        Trampoline.Continue (\() -> newBonus' game')
+      if foodCollision || collisionTest bonusPoint game.snake then
+        Trampoline.Continue (\_ -> newBonus' game')
       else
         Trampoline.Done game'
   in Trampoline.trampoline (newBonus' game)
@@ -151,52 +171,21 @@ resetBonus : Model -> Model
 resetBonus game =
   let
     (ticks, seed') = randomInt minTicksToNextBonus maxTicksToNextBonus game.seed
+    bonus' = { point = Nothing, ticks = ticks }
   in
-    { game
-    | seed <- seed'
-    , bonus <-
-      { point = Nothing
-      , ticks = ticks
-      }
-    }
+    { game | seed <- seed', bonus <- bonus' }
 
 
-updateGame : Update -> Model -> Model
-updateGame input game =
-  case input of
-    Reset -> newGame game
-    Arrows (arrows) -> { game | arrows <- arrows }
-    Wasd (wasd) -> { game | arrows <- wasd }
-    Tick _ -> tickGame game
-    Space (down) -> if down then changeGameMode game else game
-    _ -> game
-
-
-initialGame : Update -> Model
-initialGame input =
-  case input of
-    StartTime time ->
-      { defaultGame | seed <- Random.initialSeed (round time) }
-      |> newFood
-      |> resetBonus
-    _ -> defaultGame
-
-
-changeGameMode : Model -> Model
-changeGameMode game =
-  case game.mode of
-    NewGame -> newGame game
-    Play -> { game | mode <- Pause }
-    Pause -> { game | mode <- Play }
-    Dead _ -> game
-    GameOver -> newGame game
+collisionTest : Point -> List Point -> Bool
+collisionTest testPoint candidates =
+  List.any (\point -> testPoint == point) candidates
 
 
 tickGame : Model -> Model
 tickGame game =
   case game.mode of
     Play -> tickPlay game
-    Dead (count) -> tickDead game count
+    Dead count -> tickDead game count
     _ -> game
 
 
@@ -274,14 +263,14 @@ tickBonus game =
 getHead : Model -> Point
 getHead game =
   case List.head game.snake of
-    Just (point) -> point
+    Just point -> point
     Nothing -> defaultPoint
 
 
 getTail : Model -> List Point
 getTail game =
   case List.tail game.snake of
-    Just (tail) -> tail
+    Just tail -> tail
     Nothing -> []
 
 
@@ -290,10 +279,10 @@ moveHead game direction =
   let
     oldHead = getHead game
     newHead = case direction of
-      Up    -> { oldHead | y <- oldHead.y - 1 }
+      Up -> { oldHead | y <- oldHead.y - 1 }
       Right -> { oldHead | x <- oldHead.x + 1 }
-      Down  -> { oldHead | y <- oldHead.y + 1 }
-      Left  -> { oldHead | x <- oldHead.x - 1 }
+      Down -> { oldHead | y <- oldHead.y + 1 }
+      Left -> { oldHead | x <- oldHead.x - 1 }
   in
     wrapPoint newHead
 

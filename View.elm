@@ -46,7 +46,7 @@ view (w, h) game =
           Snake.NewGame -> (background :: gameText game)
           Snake.Pause -> (background :: score :: gameText game)
           Snake.GameOver -> (background :: score :: gameText game)
-          _ -> (List.concat [[background], gameLayer width height game, [score, bonus]])
+          _ -> (List.concat [background :: gameLayer width height game, [score, bonus]])
 
 
 styledText : Color -> String -> Form
