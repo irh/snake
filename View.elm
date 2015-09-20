@@ -1,10 +1,10 @@
-module View where
+module View (view) where
 
 import Color exposing (Color, rgb)
 import Debug
 import Graphics.Collage exposing (..)
 import Graphics.Element exposing (..)
-import Snake exposing (Model)
+import Snake
 import Text
 import Window
 
@@ -21,7 +21,7 @@ textColor = rgb 250 250 150
 textHeight = 30
 
 
-view : (Int, Int) -> Model -> Element
+view : (Int, Int) -> Snake.Model -> Element
 view (w, h) game =
   let
     width = Snake.gameWidth * cellSize
@@ -67,7 +67,7 @@ textStyle color =
   }
 
 
-gameText : Model -> List Form
+gameText : Snake.Model -> List Form
 gameText game =
   let (first, second) = case game.mode of
     Snake.NewGame -> ("SNAKE", "PRESS SPACE TO PLAY")
@@ -82,7 +82,7 @@ gameText game =
     ]
 
 
-gameLayer : Int -> Int -> Model -> List Form
+gameLayer : Int -> Int -> Snake.Model -> List Form
 gameLayer width height game =
   let
     food = makeCell game.food width height foodColor

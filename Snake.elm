@@ -1,4 +1,18 @@
-module Snake where
+module Snake
+  ( Update(..)
+  , Mode(..)
+  , Model
+  , Point
+  , deathFlashCount
+  , gameWidth
+  , gameHeight
+  , tickFps
+  , initialGame
+  , updateGame
+  , activeBonusTicks
+  , getHead
+  , getTail
+  ) where
 
 import Debug
 import Random exposing(Seed)
