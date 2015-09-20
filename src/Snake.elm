@@ -108,7 +108,7 @@ updateGame input game =
     Arrows arrows -> { game | arrows <- arrows }
     Wasd wasd -> { game | arrows <- wasd }
     Tick _ -> tickGame game
-    Space down -> if down then changeGameMode game else game
+    Space True -> changeGameMode game
     _ -> game
 
 
@@ -204,8 +204,7 @@ tickGame game =
 
 tickDead : Model -> Int -> Model
 tickDead game count =
-  let
-    nextCount = count + 1
+  let nextCount = count + 1
   in
     if nextCount == deathTicks then
       { game | mode <- GameOver }
@@ -249,42 +248,43 @@ tickFood game =
 
 tickBonus : Model -> Model
 tickBonus game =
-  case game.bonus.point of
-    Just point ->
-      if collisionTest point game.snake then
-        { game
-        | length <- game.length + foodEnergy
-        , score <- game.score + bonusScore
-        }
-        |> resetBonus
-      else
-        let ticks' = game.bonus.ticks - 1
-        in
-          if ticks' == 0 then
+  let bonus' =
+    { point = game.bonus.point
+    , ticks = game.bonus.ticks - 1
+    }
+  in
+    case bonus'.point of
+      Just point ->
+        if collisionTest point game.snake then
+          { game
+          | length <- game.length + foodEnergy
+          , score <- game.score + bonusScore
+          }
+          |> resetBonus
+        else
+          if bonus'.ticks == 0 then
             game |> resetBonus
           else
-            { game | bonus <- { point = game.bonus.point, ticks = ticks' } }
-    Nothing ->
-      let ticks' = game.bonus.ticks - 1
-      in
-        if ticks' == 0 then
+            { game | bonus <- bonus' }
+      Nothing ->
+        if bonus'.ticks == 0 then
           game |> newBonus
         else
-          { game | bonus <- { point = game.bonus.point, ticks = ticks' } }
+          { game | bonus <- bonus' }
 
 
 getHead : Model -> Point
 getHead game =
-  case List.head game.snake of
-    Just point -> point
-    Nothing -> defaultPoint
+  case game.snake of
+    head :: tail -> head
+    [] -> defaultPoint
 
 
 getTail : Model -> List Point
 getTail game =
-  case List.tail game.snake of
-    Just tail -> tail
-    Nothing -> []
+  case game.snake of
+    head :: tail -> tail
+    [] -> []
 
 
 moveHead : Model -> Direction -> Point
