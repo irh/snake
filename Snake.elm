@@ -51,6 +51,7 @@ type alias Model =
 type Update =
   Reset
   | Arrows Point
+  | Wasd Point
   | Tick Float
   | Space Bool
 
@@ -165,6 +166,7 @@ update input game =
   case input of
     Reset -> newGame game
     Arrows (arrows) -> { game | arrows <- arrows }
+    Wasd (wasd) -> { game | arrows <- wasd }
     Tick _ -> tickGame game
     Space (down) -> if down then changeGameMode game else game
 

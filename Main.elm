@@ -15,6 +15,7 @@ updateSignal =
   Signal.mergeMany
   [ Signal.map Snake.Tick (Time.fps Snake.tickFps)
   , Signal.map Snake.Arrows Keyboard.arrows
+  , Signal.map Snake.Wasd Keyboard.wasd
   , Signal.map Snake.Space Keyboard.space
   ]
 
