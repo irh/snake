@@ -2,6 +2,8 @@ module Main where
 
 import Graphics.Element exposing (Element)
 import Keyboard
+import Signal.Extra
+import Signal.Time
 import Snake
 import Time
 import View
@@ -13,7 +15,8 @@ import Window
 updateSignal : Signal Snake.Update
 updateSignal =
   Signal.mergeMany
-  [ Signal.map Snake.Tick (Time.fps Snake.tickFps)
+  [ Signal.map Snake.StartTime Signal.Time.startTime
+  , Signal.map Snake.Tick (Time.fps Snake.tickFps)
   , Signal.map Snake.Arrows Keyboard.arrows
   , Signal.map Snake.Wasd Keyboard.wasd
   , Signal.map Snake.Space Keyboard.space
@@ -22,7 +25,7 @@ updateSignal =
 
 gameSignal : Signal Snake.Model
 gameSignal =
-  Signal.foldp Snake.update Snake.initialGame updateSignal
+  Signal.Extra.foldp' Snake.updateGame Snake.initialGame updateSignal
 
 
 main : Signal Element

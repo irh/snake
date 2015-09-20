@@ -54,6 +54,7 @@ type Update =
   | Wasd Point
   | Tick Float
   | Space Bool
+  | StartTime Float
 
 
 defaultPoint : Point
@@ -73,7 +74,7 @@ defaultGame =
   , length = 2
   , food = defaultPoint
   , bonus = defaultBonus
-  , seed = Random.initialSeed 420
+  , seed = Random.initialSeed 0
   , score = 0
   }
 
@@ -86,11 +87,6 @@ newGame game =
   }
   |> newFood
   |> resetBonus
-
-
-initialGame : Model
-initialGame =
-  defaultGame |> newFood |> resetBonus
 
 
 collisionTest : Point -> List Point -> Bool
@@ -165,14 +161,25 @@ resetBonus game =
     }
 
 
-update : Update -> Model -> Model
-update input game =
+updateGame : Update -> Model -> Model
+updateGame input game =
   case input of
     Reset -> newGame game
     Arrows (arrows) -> { game | arrows <- arrows }
     Wasd (wasd) -> { game | arrows <- wasd }
     Tick _ -> tickGame game
     Space (down) -> if down then changeGameMode game else game
+    _ -> game
+
+
+initialGame : Update -> Model
+initialGame input =
+  case input of
+    StartTime time ->
+      { defaultGame | seed <- Random.initialSeed (round time) }
+      |> newFood
+      |> resetBonus
+    _ -> defaultGame
 
 
 changeGameMode : Model -> Model
@@ -187,7 +194,6 @@ changeGameMode game =
 
 tickGame : Model -> Model
 tickGame game =
-  Debug.watchSummary "game" (\_ -> game.mode) <|
   case game.mode of
     Play -> tickPlay game
     Dead (count) -> tickDead game count
