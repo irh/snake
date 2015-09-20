@@ -34,16 +34,15 @@ minTicksToNextBonus = 200
 maxTicksToNextBonus = 400
 
 
-type Update =
-  Reset
-  | Arrows Point
+type Update
+  = Arrows Point
   | Wasd Point
   | Tick Float
   | Space Bool
   | StartTime Float
 
-type Mode =
-  NewGame
+type Mode
+  = NewGame
   | Play
   | Pause
   | Dead Int
@@ -116,7 +115,6 @@ initialGame input =
 updateGame : Update -> Model -> Model
 updateGame input game =
   case input of
-    Reset -> newGame game
     Arrows arrows -> { game | arrows <- arrows }
     Wasd wasd -> { game | arrows <- wasd }
     Tick _ -> tickGame game
