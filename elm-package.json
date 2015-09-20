@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "summary": "Snake!",
-    "repository": "https://github.com/USER/PROJECT.git",
+    "repository": "https://github.com/irh/snake.git",
     "license": "BSD3",
     "source-directories": [
         "."
