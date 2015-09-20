@@ -98,11 +98,16 @@ collisionTest testPoint candidates =
   List.any (\point -> testPoint == point) candidates
 
 
+randomInt : Int -> Int -> Seed -> (Int, Seed)
+randomInt min max seed =
+  Random.generate (Random.int min max) seed
+
+
 randomPoint : Seed -> (Point, Seed)
 randomPoint seed =
   let
-    (x, seed0) = Random.generate (Random.int 0 (gameWidth - 1)) seed
-    (y, seed1) = Random.generate (Random.int 0 (gameHeight - 1)) seed0
+    (x, seed0) = randomInt 0 (gameWidth - 1) seed
+    (y, seed1) = randomInt 0 (gameHeight - 1) seed0
   in
     ({x = x, y = y}, seed1)
 
@@ -149,8 +154,7 @@ newBonus game =
 resetBonus : Model -> Model
 resetBonus game =
   let
-    (ticks, seed') =
-      Random.generate (Random.int minTicksToNextBonus maxTicksToNextBonus) game.seed
+    (ticks, seed') = randomInt minTicksToNextBonus maxTicksToNextBonus game.seed
   in
     { game
     | seed <- seed'
@@ -221,9 +225,7 @@ tickPlay game =
 
 tickSnake : Model -> Model
 tickSnake game =
-  { game
-  | snake <- List.take game.length game.snake
-  }
+  { game | snake <- List.take game.length game.snake }
 
 
 tickFood : Model -> Model
@@ -302,9 +304,9 @@ wrapInt input min max =
   let
     size = max - min
   in
-    if input < min then input + size
-    else if input >= max then input - size
-    else input
+    if | input < min -> input + size
+       | input >= max -> input - size
+       | otherwise -> input
 
 
 changeDirection : Model -> Direction
@@ -313,8 +315,8 @@ changeDirection game =
     x = game.arrows.x
     y = game.arrows.y
   in
-    if x > 0 && game.direction /= Left then Right
-    else if x < 0 && game.direction /= Right then Left
-    else if y < 0 && game.direction /= Down then Up
-    else if y > 0 && game.direction /= Up then Down
-    else game.direction
+    if | x > 0 && game.direction /= Left -> Right
+       | x < 0 && game.direction /= Right -> Left
+       | y < 0 && game.direction /= Down -> Up
+       | y > 0 && game.direction /= Up -> Down
+       | otherwise -> game.direction

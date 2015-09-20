@@ -41,18 +41,18 @@ view (w, h) game =
       |> move ((toFloat 30 - width / 2), (toFloat height / 2 - 20))
   in
     container w h middle <|
-      collage width height
-      (case game.mode of
-        Snake.NewGame -> (background :: gameText game)
-        Snake.Pause -> (background :: score :: gameText game)
-        Snake.GameOver -> (background :: score :: gameText game)
-        _ -> (List.concat [[background], gameLayer width height game, [score, bonus]])
-      )
+      collage width height <|
+        case game.mode of
+          Snake.NewGame -> (background :: gameText game)
+          Snake.Pause -> (background :: score :: gameText game)
+          Snake.GameOver -> (background :: score :: gameText game)
+          _ -> (List.concat [[background], gameLayer width height game, [score, bonus]])
+
 
 styledText : Color -> String -> Form
 styledText color string =
   Text.fromString string
-  |> Text.style ( textStyle color )
+  |> Text.style (textStyle color)
   |> Graphics.Collage.text
 
 
@@ -97,8 +97,7 @@ gameLayer width height game =
       Snake.Dead (count) ->
         if (count % (Snake.deathFlashCount * 2) >= Snake.deathFlashCount) then
           (head :: tail)
-        else
-          []
+        else []
       _ -> (head :: tail)
   in
     case bonus of
