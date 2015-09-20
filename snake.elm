@@ -49,7 +49,7 @@ textStyle color =
 
 -- Model
 
-type State =
+type Mode =
   NewGame
   | Play
   | Pause
@@ -65,8 +65,8 @@ type alias Bonus =
   , ticks : Int
   }
 
-type alias Game =
-  { state : State
+type alias Model =
+  { mode : Mode
   , direction : Direction
   , arrows : Point
   , snake : List Point
@@ -94,9 +94,9 @@ defaultBonus : Bonus
 defaultBonus = { point = Nothing, ticks = -1 }
 
 
-defaultGame : Game
+defaultGame : Model
 defaultGame =
-  { state = NewGame
+  { mode = NewGame
   , direction = Right
   , arrows = defaultPoint
   , snake = [ { x = gameWidth // 2, y = gameHeight // 2 } ]
@@ -108,17 +108,17 @@ defaultGame =
   }
 
 
-newGame : Game -> Game
+newGame : Model -> Model
 newGame game =
   { defaultGame
   | seed <- game.seed
-  , state <- Play
+  , mode <- Play
   }
   |> newFood
   |> resetBonus
 
 
-initialGame : Game
+initialGame : Model
 initialGame =
   defaultGame |> newFood |> resetBonus
 
@@ -137,7 +137,7 @@ randomPoint seed =
     ({x = x, y = y}, seed1)
 
 
-newFood : Game -> Game
+newFood : Model -> Model
 newFood game =
   let newFood' game =
     let
@@ -154,7 +154,7 @@ newFood game =
   in trampoline (newFood' game)
 
 
-newBonus : Game -> Game
+newBonus : Model -> Model
 newBonus game =
   let newBonus' game =
     let
@@ -176,7 +176,7 @@ newBonus game =
   in trampoline (newBonus' game)
 
 
-resetBonus : Game -> Game
+resetBonus : Model -> Model
 resetBonus game =
   let
     (ticks, seed') =
@@ -191,53 +191,53 @@ resetBonus game =
     }
 
 
-update : Update -> Game -> Game
+update : Update -> Model -> Model
 update input game =
   case input of
     Reset -> newGame game
     Arrows (arrows) -> { game | arrows <- arrows }
     Tick _ -> tickGame game
-    Space (down) -> if down then changeGameState game else game
+    Space (down) -> if down then changeGameMode game else game
 
 
-changeGameState : Game -> Game
-changeGameState game =
-  case game.state of
+changeGameMode : Model -> Model
+changeGameMode game =
+  case game.mode of
     NewGame -> newGame game
-    Play -> { game | state <- Pause }
-    Pause -> { game | state <- Play }
+    Play -> { game | mode <- Pause }
+    Pause -> { game | mode <- Play }
     Dead _ -> game
     GameOver -> newGame game
 
 
-tickGame : Game -> Game
+tickGame : Model -> Model
 tickGame game =
-  Debug.watchSummary "game" (\_ -> game.state) <|
-  case game.state of
+  Debug.watchSummary "game" (\_ -> game.mode) <|
+  case game.mode of
     Play -> tickPlay game
     Dead (count) -> tickDead game count
     _ -> game
 
 
-tickDead : Game -> Int -> Game
+tickDead : Model -> Int -> Model
 tickDead game count =
   let
     nextCount = count + 1
   in
     if nextCount == deathTicks then
-      { game | state <- GameOver }
+      { game | mode <- GameOver }
     else
-      { game | state <- Dead nextCount }
+      { game | mode <- Dead nextCount }
 
 
-tickPlay : Game -> Game
+tickPlay : Model -> Model
 tickPlay game =
   let
     direction' = changeDirection game
     head' = moveHead game direction'
   in
     if collisionTest head' game.snake then
-      { game | state <- Dead 0 }
+      { game | mode <- Dead 0 }
     else
       { game
       | snake <- head' :: game.snake
@@ -248,14 +248,14 @@ tickPlay game =
       |> tickSnake
 
 
-tickSnake : Game -> Game
+tickSnake : Model -> Model
 tickSnake game =
   { game
   | snake <- List.take game.length game.snake
   }
 
 
-tickFood : Game -> Game
+tickFood : Model -> Model
 tickFood game =
   if collisionTest game.food game.snake then
     { game
@@ -266,7 +266,7 @@ tickFood game =
   else game
 
 
-tickBonus : Game -> Game
+tickBonus : Model -> Model
 tickBonus game =
   case game.bonus.point of
     Just point ->
@@ -292,21 +292,21 @@ tickBonus game =
           { game | bonus <- { point = game.bonus.point, ticks = ticks' } }
 
 
-getHead : Game -> Point
+getHead : Model -> Point
 getHead game =
   case List.head game.snake of
     Just (point) -> point
     Nothing -> defaultPoint
 
 
-getTail : Game -> List Point
+getTail : Model -> List Point
 getTail game =
   case List.tail game.snake of
     Just (tail) -> tail
     Nothing -> []
 
 
-moveHead : Game -> Direction -> Point
+moveHead : Model -> Direction -> Point
 moveHead game direction =
   let
     oldHead = getHead game
@@ -336,7 +336,7 @@ wrapInt input min max =
     else input
 
 
-changeDirection : Game -> Direction
+changeDirection : Model -> Direction
 changeDirection game =
   let
     x = game.arrows.x
@@ -351,7 +351,7 @@ changeDirection game =
 
 -- View
 
-view : (Int, Int) -> Game -> Element
+view : (Int, Int) -> Model -> Element
 view (w, h) game =
   let
     width = gameWidth * cellSize
@@ -372,7 +372,7 @@ view (w, h) game =
   in
     container w h middle <|
       collage width height
-      (case game.state of
+      (case game.mode of
         NewGame -> (background :: gameText game)
         Pause -> (background :: score :: gameText game)
         GameOver -> (background :: score :: gameText game)
@@ -387,9 +387,9 @@ styledText color string =
   |> Graphics.Collage.text
 
 
-gameText : Game -> List Form
+gameText : Model -> List Form
 gameText game =
-  let (first, second) = case game.state of
+  let (first, second) = case game.mode of
     NewGame -> ("SNAKE", "PRESS SPACE TO PLAY")
     Pause -> ("PAUSED", "PRESS SPACE TO CONTINUE")
     GameOver -> ("GAME OVER", "PRESS SPACE TO RETRY")
@@ -402,7 +402,7 @@ gameText game =
     ]
 
 
-gameLayer : Int -> Int -> Game -> List Form
+gameLayer : Int -> Int -> Model -> List Form
 gameLayer width height game =
   let
     food = makeCell game.food width height foodColor
@@ -413,7 +413,7 @@ gameLayer width height game =
     tail = List.map
       (\point -> makeCell point width height snakeColor)
       (getTail game)
-    snake = case game.state of
+    snake = case game.mode of
       Dead (count) ->
         if (count % (deathFlashCount * 2) >= deathFlashCount) then
           (head :: tail)
@@ -449,7 +449,7 @@ updateSignal =
   ]
 
 
-gameSignal : Signal Game
+gameSignal : Signal Model
 gameSignal =
   Signal.foldp update initialGame updateSignal
 
