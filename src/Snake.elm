@@ -92,16 +92,6 @@ defaultGame =
   }
 
 
-newGame : Model -> Model
-newGame game =
-  { defaultGame
-  | seed <- game.seed
-  , mode <- Play
-  }
-  |> newFood
-  |> resetBonus
-
-
 initialGame : Update -> Model
 initialGame input =
   case input of
@@ -122,14 +112,24 @@ updateGame input game =
     _ -> game
 
 
+startGame : Model -> Model
+startGame game =
+  { defaultGame
+  | seed <- game.seed
+  , mode <- Play
+  }
+  |> newFood
+  |> resetBonus
+
+
 changeGameMode : Model -> Model
 changeGameMode game =
   case game.mode of
-    NewGame -> newGame game
+    NewGame -> startGame game
     Play -> { game | mode <- Pause }
     Pause -> { game | mode <- Play }
     Dead _ -> game
-    GameOver -> newGame game
+    GameOver -> startGame game
 
 
 randomInt : Int -> Int -> Seed -> (Int, Seed)
