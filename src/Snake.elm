@@ -150,13 +150,13 @@ newFood : Model -> Model
 newFood game =
   let newFood' game =
     let
-      (food, seed) = randomPoint game.seed
-      game' = { game | seed <- seed, food <- food }
+      (point', seed') = randomPoint game.seed
+      game' = { game | seed <- seed', food <- point' }
       bonusCollision = case game.bonus.point of
-        Just bonusPoint -> food == bonusPoint
+        Just bonusPoint -> point' == bonusPoint
         Nothing -> False
     in
-      if bonusCollision || collisionTest food game.snake then
+      if bonusCollision || collisionTest point' game.snake then
         Trampoline.Continue (\_ -> newFood' game')
       else
         Trampoline.Done game'
@@ -167,12 +167,12 @@ newBonus : Model -> Model
 newBonus game =
   let newBonus' game =
     let
-      (bonusPoint, seed) = randomPoint game.seed
-      bonus' = { point = Just bonusPoint, ticks = activeBonusTicks }
-      game' = { game | seed <- seed , bonus <- bonus' }
-      foodCollision = bonusPoint == game.food
+      (point', seed') = randomPoint game.seed
+      bonus' = { point = Just point', ticks = activeBonusTicks }
+      game' = { game | seed <- seed', bonus <- bonus' }
+      foodCollision = point' == game.food
     in
-      if foodCollision || collisionTest bonusPoint game.snake then
+      if foodCollision || collisionTest point' game.snake then
         Trampoline.Continue (\_ -> newBonus' game')
       else
         Trampoline.Done game'
@@ -204,12 +204,10 @@ tickGame game =
 
 tickDead : Model -> Int -> Model
 tickDead game count =
-  let nextCount = count + 1
-  in
-    if nextCount == deathTicks then
-      { game | mode <- GameOver }
-    else
-      { game | mode <- Dead nextCount }
+  if (count + 1) == deathTicks then
+    { game | mode <- GameOver }
+  else
+    { game | mode <- Dead (count + 1) }
 
 
 tickPlay : Model -> Model
@@ -238,11 +236,11 @@ tickSnake game =
 tickFood : Model -> Model
 tickFood game =
   if collisionTest game.food game.snake then
-    { game
-    | length <- game.length + foodEnergy
-    , score <- game.score + foodScore
-    }
-    |> newFood
+    newFood
+      { game
+      | length <- game.length + foodEnergy
+      , score <- game.score + foodScore
+      }
   else game
 
 
@@ -256,21 +254,19 @@ tickBonus game =
     case bonus'.point of
       Just point ->
         if collisionTest point game.snake then
-          { game
-          | length <- game.length + foodEnergy
-          , score <- game.score + bonusScore
-          }
-          |> resetBonus
+          resetBonus
+            { game
+            | length <- game.length + foodEnergy
+            , score <- game.score + bonusScore
+            }
         else
-          if bonus'.ticks == 0 then
-            game |> resetBonus
-          else
-            { game | bonus <- bonus' }
+          case bonus'.ticks of
+            0 -> resetBonus game
+            _ -> { game | bonus <- bonus' }
       Nothing ->
-        if bonus'.ticks == 0 then
-          game |> newBonus
-        else
-          { game | bonus <- bonus' }
+        case bonus'.ticks of
+          0 -> newBonus game
+          _ -> { game | bonus <- bonus' }
 
 
 getHead : Model -> Point
