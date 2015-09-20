@@ -16,27 +16,34 @@ import Window
 cellSize = 16
 
 foodEnergy = 4
+foodScore = 1
+bonusScore = 5
 
 backColor = rgb 0 100 0
 snakeColor = rgb 100 200 100
 headColor = rgb 60 160 60
 foodColor = rgb 200 200 100
+bonusColor = rgb 220 100 50
 textColor = rgb 250 250 150
 
 tickFps = 20
 deathTicks = 32
 deathFlashCount = deathTicks // 4
 
+activeBonusTicks = 60
+minTicksToNextBonus = 200
+maxTicksToNextBonus = 400
+
 textHeight = 30
 
-textStyle : Text.Style
-textStyle =
+textStyle : Color -> Text.Style
+textStyle color =
   { typeface = [ "monospace" ]
-  , height   = Just textHeight
-  , color    = textColor
-  , bold     = True
-  , italic   = False
-  , line     = Nothing
+  , height = Just textHeight
+  , color = color
+  , bold = True
+  , italic = False
+  , line = Nothing
   }
 
 
@@ -53,6 +60,11 @@ type Direction = Up | Right | Down | Left
 
 type alias Point = { x : Int, y : Int }
 
+type alias Bonus =
+  { point : Maybe Point
+  , ticks : Int
+  }
+
 type alias Game =
   { state : State
   , direction : Direction
@@ -60,6 +72,7 @@ type alias Game =
   , snake : List Point
   , length : Int
   , food : Point
+  , bonus : Bonus
   , seed : Seed
   , score : Int
   }
@@ -77,13 +90,8 @@ defaultPoint : Point
 defaultPoint = { x = 0, y = 0 }
 
 
-randomPoint : Seed -> (Point, Seed)
-randomPoint seed =
-  let
-    (x, seed0) = generate (Random.int 0 (gameWidth - 1)) seed
-    (y, seed1) = generate (Random.int 0 (gameHeight - 1)) seed0
-  in
-    ({x = x, y = y}, seed1)
+defaultBonus : Bonus
+defaultBonus = { point = Nothing, ticks = -1 }
 
 
 defaultGame : Game
@@ -94,6 +102,7 @@ defaultGame =
   , snake = [ { x = gameWidth // 2, y = gameHeight // 2 } ]
   , length = 2
   , food = defaultPoint
+  , bonus = defaultBonus
   , seed = initialSeed 420
   , score = 0
   }
@@ -106,16 +115,26 @@ newGame game =
   , state <- Play
   }
   |> newFood
+  |> resetBonus
 
 
 initialGame : Game
 initialGame =
-  defaultGame |> newFood
+  defaultGame |> newFood |> resetBonus
 
 
 collisionTest : Point -> List Point -> Bool
 collisionTest testPoint candidates =
   List.any (\point -> testPoint == point) candidates
+
+
+randomPoint : Seed -> (Point, Seed)
+randomPoint seed =
+  let
+    (x, seed0) = generate (Random.int 0 (gameWidth - 1)) seed
+    (y, seed1) = generate (Random.int 0 (gameHeight - 1)) seed0
+  in
+    ({x = x, y = y}, seed1)
 
 
 newFood : Game -> Game
@@ -124,13 +143,52 @@ newFood game =
     let
       (food, seed) = randomPoint game.seed
       game' = { game | seed <- seed, food <- food }
+      bonusCollision = case game.bonus.point of
+        Just bonusPoint -> food == bonusPoint
+        Nothing -> False
     in
-      if collisionTest food game.snake then
+      if bonusCollision || collisionTest food game.snake then
         Continue (\() -> newFood' game')
       else
         Done game'
+  in trampoline (newFood' game)
+
+
+newBonus : Game -> Game
+newBonus game =
+  let newBonus' game =
+    let
+      (bonus, seed) = randomPoint game.seed
+      game' =
+        { game
+        | seed <- seed
+        , bonus <-
+          { point = Just bonus
+          , ticks = activeBonusTicks
+          }
+        }
+      foodCollision = bonus == game.food
+    in
+      if foodCollision || collisionTest bonus game.snake then
+        Continue (\() -> newBonus' game')
+      else
+        Done game'
+  in trampoline (newBonus' game)
+
+
+resetBonus : Game -> Game
+resetBonus game =
+  let
+    (ticks, seed') =
+      generate (Random.int minTicksToNextBonus maxTicksToNextBonus) game.seed
   in
-    trampoline (newFood' game)
+    { game
+    | seed <- seed'
+    , bonus <-
+      { point = Nothing
+      , ticks = ticks
+      }
+    }
 
 
 update : Update -> Game -> Game
@@ -156,7 +214,7 @@ tickGame : Game -> Game
 tickGame game =
   Debug.watchSummary "game" (\_ -> game.state) <|
   case game.state of
-    Play -> moveSnake game
+    Play -> tickPlay game
     Dead (count) -> tickDead game count
     _ -> game
 
@@ -172,30 +230,66 @@ tickDead game count =
       { game | state <- Dead nextCount }
 
 
-moveSnake : Game -> Game
-moveSnake game =
+tickPlay : Game -> Game
+tickPlay game =
   let
-    newDirection = changeDirection game
-    newHead = moveHead game newDirection
+    direction' = changeDirection game
+    head' = moveHead game direction'
   in
-    if collisionTest newHead game.snake then
+    if collisionTest head' game.snake then
       { game | state <- Dead 0 }
     else
-      let
-        newSnake = (newHead :: game.snake)
-        foodEaten = collisionTest game.food newSnake
-        newLength = if foodEaten then (game.length + foodEnergy) else game.length
-        newScore = if foodEaten then (game.score + 1) else game.score
-        result =
-          { game
-          | snake <- List.take newLength newSnake
-          , direction <- newDirection
-          , length <- newLength
-          , score <- newScore
-          }
+      { game
+      | snake <- head' :: game.snake
+      , direction <- direction'
+      }
+      |> tickBonus
+      |> tickFood
+      |> tickSnake
+
+
+tickSnake : Game -> Game
+tickSnake game =
+  { game
+  | snake <- List.take game.length game.snake
+  }
+
+
+tickFood : Game -> Game
+tickFood game =
+  if collisionTest game.food game.snake then
+    { game
+    | length <- game.length + foodEnergy
+    , score <- game.score + foodScore
+    }
+    |> newFood
+  else game
+
+
+tickBonus : Game -> Game
+tickBonus game =
+  case game.bonus.point of
+    Just point ->
+      if collisionTest point game.snake then
+        { game
+        | length <- game.length + foodEnergy
+        , score <- game.score + bonusScore
+        }
+        |> resetBonus
+      else
+        let ticks' = game.bonus.ticks - 1
+        in
+          if ticks' == 0 then
+            game |> resetBonus
+          else
+            { game | bonus <- { point = game.bonus.point, ticks = ticks' } }
+    Nothing ->
+      let ticks' = game.bonus.ticks - 1
       in
-        Debug.watchSummary "result" (\_ -> result.food) <|
-        if foodEaten then (result |> newFood) else result
+        if ticks' == 0 then
+          game |> newBonus
+        else
+          { game | bonus <- { point = game.bonus.point, ticks = ticks' } }
 
 
 getHead : Game -> Point
@@ -262,10 +356,19 @@ view (w, h) game =
   let
     width = gameWidth * cellSize
     height = gameHeight * cellSize
-    background = rect width height |> filled backColor
+    background = rect width height
+      |> filled backColor
     score = toString game.score
-      |> styledText
+      |> styledText textColor
       |> move ((toFloat width / 2 - 30), (toFloat height / 2 - 20))
+    bonusString = case game.bonus.point of
+      Just _ ->
+        let x = activeBonusTicks // 10
+        in toString ((game.bonus.ticks + x - 1) // x)
+      Nothing -> ""
+    bonus = bonusString
+      |> styledText bonusColor
+      |> move ((toFloat 30 - width / 2), (toFloat height / 2 - 20))
   in
     container w h middle <|
       collage width height
@@ -273,14 +376,14 @@ view (w, h) game =
         NewGame -> (background :: gameText game)
         Pause -> (background :: score :: gameText game)
         GameOver -> (background :: score :: gameText game)
-        _ -> (List.concat [[background], gameLayer width height game, [score]])
+        _ -> (List.concat [[background], gameLayer width height game, [score, bonus]])
       )
 
 
-styledText : String -> Form
-styledText string =
+styledText : Color -> String -> Form
+styledText color string =
   Text.fromString string
-  |> Text.style textStyle
+  |> Text.style ( textStyle color )
   |> Graphics.Collage.text
 
 
@@ -292,9 +395,9 @@ gameText game =
     GameOver -> ("GAME OVER", "PRESS SPACE TO RETRY")
     _ -> ("", "")
   in
-    [ styledText first
+    [ styledText textColor first
       |> move (0, textHeight)
-    , styledText second
+    , styledText textColor second
       |> move (0, -textHeight)
     ]
 
@@ -303,6 +406,9 @@ gameLayer : Int -> Int -> Game -> List Form
 gameLayer width height game =
   let
     food = makeCell game.food width height foodColor
+    bonus = case game.bonus.point of
+      Just bonusPoint -> Just (makeCell bonusPoint width height bonusColor)
+      Nothing -> Nothing
     head = makeCell (getHead game) width height headColor
     tail = List.map
       (\point -> makeCell point width height snakeColor)
@@ -315,7 +421,9 @@ gameLayer width height game =
           []
       _ -> (head :: tail)
   in
-    food :: snake
+    case bonus of
+      Just bonusCell -> food :: bonusCell :: snake
+      Nothing -> food :: snake
 
 
 makeCell : Point -> Int -> Int -> Color -> Form
