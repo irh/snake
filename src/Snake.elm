@@ -96,7 +96,7 @@ initialGame : Update -> Model
 initialGame input =
   case input of
     StartTime time ->
-      { defaultGame | seed <- Random.initialSeed (round time) }
+      { defaultGame | seed = Random.initialSeed (round time) }
       |> newFood
       |> resetBonus
     _ -> defaultGame
@@ -105,8 +105,8 @@ initialGame input =
 updateGame : Update -> Model -> Model
 updateGame input game =
   case input of
-    Arrows arrows -> { game | arrows <- arrows }
-    Wasd wasd -> { game | arrows <- wasd }
+    Arrows arrows -> { game | arrows = arrows }
+    Wasd wasd -> { game | arrows = wasd }
     Tick _ -> tickGame game
     Space True -> changeGameMode game
     _ -> game
@@ -115,8 +115,8 @@ updateGame input game =
 startGame : Model -> Model
 startGame game =
   { defaultGame
-  | seed <- game.seed
-  , mode <- Play
+  | seed = game.seed
+  , mode = Play
   }
   |> newFood
   |> resetBonus
@@ -126,8 +126,8 @@ changeGameMode : Model -> Model
 changeGameMode game =
   case game.mode of
     NewGame -> startGame game
-    Play -> { game | mode <- Pause }
-    Pause -> { game | mode <- Play }
+    Play -> { game | mode = Pause }
+    Pause -> { game | mode = Play }
     Dead _ -> game
     GameOver -> startGame game
 
@@ -151,7 +151,7 @@ newFood game =
   let newFood' game =
     let
       (point', seed') = randomPoint game.seed
-      game' = { game | seed <- seed', food <- point' }
+      game' = { game | seed = seed', food = point' }
       bonusCollision = case game.bonus.point of
         Just bonusPoint -> point' == bonusPoint
         Nothing -> False
@@ -169,7 +169,7 @@ newBonus game =
     let
       (point', seed') = randomPoint game.seed
       bonus' = { point = Just point', ticks = activeBonusTicks }
-      game' = { game | seed <- seed', bonus <- bonus' }
+      game' = { game | seed = seed', bonus = bonus' }
       foodCollision = point' == game.food
     in
       if foodCollision || collisionTest point' game.snake then
@@ -185,7 +185,7 @@ resetBonus game =
     (ticks, seed') = randomInt minTicksToNextBonus maxTicksToNextBonus game.seed
     bonus' = { point = Nothing, ticks = ticks }
   in
-    { game | seed <- seed', bonus <- bonus' }
+    { game | seed = seed', bonus = bonus' }
 
 
 collisionTest : Point -> List Point -> Bool
@@ -205,9 +205,9 @@ tickGame game =
 tickDead : Model -> Int -> Model
 tickDead game count =
   if (count + 1) == deathTicks then
-    { game | mode <- GameOver }
+    { game | mode = GameOver }
   else
-    { game | mode <- Dead (count + 1) }
+    { game | mode = Dead (count + 1) }
 
 
 tickPlay : Model -> Model
@@ -217,11 +217,11 @@ tickPlay game =
     head' = moveHead game direction'
   in
     if collisionTest head' game.snake then
-      { game | mode <- Dead 0 }
+      { game | mode = Dead 0 }
     else
       { game
-      | snake <- head' :: game.snake
-      , direction <- direction'
+      | snake = head' :: game.snake
+      , direction = direction'
       }
       |> tickBonus
       |> tickFood
@@ -230,7 +230,7 @@ tickPlay game =
 
 tickSnake : Model -> Model
 tickSnake game =
-  { game | snake <- List.take game.length game.snake }
+  { game | snake = List.take game.length game.snake }
 
 
 tickFood : Model -> Model
@@ -238,8 +238,8 @@ tickFood game =
   if collisionTest game.food game.snake then
     newFood
       { game
-      | length <- game.length + foodEnergy
-      , score <- game.score + foodScore
+      | length = game.length + foodEnergy
+      , score = game.score + foodScore
       }
   else game
 
@@ -256,17 +256,17 @@ tickBonus game =
         if collisionTest point game.snake then
           resetBonus
             { game
-            | length <- game.length + foodEnergy
-            , score <- game.score + bonusScore
+            | length = game.length + foodEnergy
+            , score = game.score + bonusScore
             }
         else
           case bonus'.ticks of
             0 -> resetBonus game
-            _ -> { game | bonus <- bonus' }
+            _ -> { game | bonus = bonus' }
       Nothing ->
         case bonus'.ticks of
           0 -> newBonus game
-          _ -> { game | bonus <- bonus' }
+          _ -> { game | bonus = bonus' }
 
 
 getHead : Model -> Point
@@ -288,10 +288,10 @@ moveHead game direction =
   let
     oldHead = getHead game
     newHead = case direction of
-      Up -> { oldHead | y <- oldHead.y + 1 }
-      Right -> { oldHead | x <- oldHead.x + 1 }
-      Down -> { oldHead | y <- oldHead.y - 1 }
-      Left -> { oldHead | x <- oldHead.x - 1 }
+      Up -> { oldHead | y = oldHead.y + 1 }
+      Right -> { oldHead | x = oldHead.x + 1 }
+      Down -> { oldHead | y = oldHead.y - 1 }
+      Left -> { oldHead | x = oldHead.x - 1 }
   in
     wrapPoint newHead
 
@@ -308,9 +308,12 @@ wrapInt input min max =
   let
     size = max - min
   in
-    if | input < min -> input + size
-       | input >= max -> input - size
-       | otherwise -> input
+    if input < min then
+      input + size
+    else if input >= max then
+      input - size
+    else
+      input
 
 
 changeDirection : Model -> Direction
@@ -319,8 +322,13 @@ changeDirection game =
     x = game.arrows.x
     y = game.arrows.y
   in
-    if | x > 0 && game.direction /= Left -> Right
-       | x < 0 && game.direction /= Right -> Left
-       | y > 0 && game.direction /= Down -> Up
-       | y < 0 && game.direction /= Up -> Down
-       | otherwise -> game.direction
+    if x > 0 && game.direction /= Left then
+      Right
+    else if x < 0 && game.direction /= Right then
+      Left
+    else if y > 0 && game.direction /= Down then
+      Up
+    else if y < 0 && game.direction /= Up then
+      Down
+    else
+      game.direction
