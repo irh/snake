@@ -1,0 +1,29 @@
+{
+  "name": "snake",
+  "version": "1.0.0",
+  "description": "Snake =====",
+  "main": "elm.js",
+  "dependencies": {},
+  "devDependencies": {
+    "gulp": "^3.9.0",
+    "gulp-concat": "^2.6.0",
+    "gulp-elm": "^0.2.0",
+    "gulp-jshint": "^2.0.0",
+    "gulp-rename": "^1.2.2",
+    "gulp-uglify": "^1.5.1",
+    "jshint": "^2.8.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irh/snake.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/irh/snake/issues"
+  },
+  "homepage": "https://github.com/irh/snake#readme"
+}
