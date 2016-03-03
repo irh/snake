@@ -1,0 +1,28 @@
+var soundSprite = {
+  "urls": [
+    "sounds//sprite.mp3",
+    "sounds//sprite.ac3"
+  ],
+  "sprite": {
+    "bonus-eaten": [
+      0,
+      495.96371882086163
+    ],
+    "bonus-tick-high": [
+      1500,
+      149.2743764172335
+    ],
+    "bonus-tick-low": [
+      3000,
+      126.93877551020405
+    ],
+    "food-eaten": [
+      4500,
+      314.3764172335599
+    ],
+    "snake-died": [
+      6000,
+      1710.9977324263034
+    ]
+  }
+};
