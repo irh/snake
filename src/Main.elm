@@ -1,34 +1,30 @@
 module Main (main) where
 
-import Graphics.Element exposing (Element)
 import Keyboard
-import Signal.Extra
-import Signal.Time
+import Primer
 import Snake
+import StartApp
 import Time
 import View
 import Window
 
 
--- Signals
-
-updateSignal : Signal Snake.Update
-updateSignal =
-  Signal.mergeMany
-  [ Signal.map Snake.StartTime Signal.Time.startTime
-  , Signal.map Snake.Tick (Time.fps Snake.tickFps)
+inputSignals =
+  [ Signal.map Snake.Tick (Time.fps Snake.tickFps)
   , Signal.map Snake.Arrows Keyboard.arrows
   , Signal.map Snake.Wasd Keyboard.wasd
   , Signal.map Snake.Space Keyboard.space
+  , Signal.map Snake.Window (Primer.prime Window.dimensions)
   ]
 
+app =
+  StartApp.start
+    { init = Snake.initialGame
+    , update = Snake.updateGame
+    , view = View.view
+    , inputs = inputSignals
+    }
 
-gameSignal : Signal Snake.Model
-gameSignal =
-  Signal.Extra.foldp' Snake.updateGame Snake.initialGame updateSignal
-
-
-main : Signal Element
 main =
-  Signal.map2 View.view Window.dimensions gameSignal
+  app.html
 

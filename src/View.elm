@@ -4,6 +4,7 @@ import Color exposing (Color, rgb)
 import Debug
 import Graphics.Collage exposing (..)
 import Graphics.Element exposing (..)
+import Html exposing (..)
 import Snake
 import Text
 import Window
@@ -21,8 +22,8 @@ textColor = rgb 250 250 150
 textHeight = 30
 
 
-view : (Int, Int) -> Snake.Model -> Element
-view (w, h) game =
+view : Signal.Address Snake.Action -> Snake.Model -> Html
+view _ game =
   let
     width = Snake.gameWidth * cellSize
     height = Snake.gameHeight * cellSize
@@ -40,13 +41,15 @@ view (w, h) game =
       |> styledText bonusColor
       |> move ((toFloat 30 - width / 2), (toFloat height / 2 - 20))
   in
-    container w h middle <|
-      collage width height <|
-        case game.mode of
-          Snake.NewGame -> (background :: gameText game)
-          Snake.Pause -> (background :: score :: gameText game)
-          Snake.GameOver -> (background :: score :: gameText game)
-          _ -> (List.concat [background :: gameLayer width height game, [score, bonus]])
+    ( case game.mode of
+        Snake.NewGame -> (background :: gameText game)
+        Snake.Pause -> (background :: score :: gameText game)
+        Snake.GameOver -> (background :: score :: gameText game)
+        _ -> (List.concat [background :: gameLayer width height game, [score, bonus]])
+    )
+    |> collage width height
+    |> container (fst game.window) (snd game.window) middle
+    |> Html.fromElement
 
 
 styledText : Color -> String -> Form

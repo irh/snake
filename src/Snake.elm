@@ -1,5 +1,5 @@
 module Snake
-  ( Update(..)
+  ( Action(..)
   , Mode(..)
   , Model
   , Point
@@ -15,7 +15,11 @@ module Snake
   ) where
 
 import Debug
+import Effects exposing (Effects)
 import Random exposing(Seed)
+import Task
+import TaskTutorial exposing (getCurrentTime)
+import Time exposing(Time)
 import Trampoline
 
 
@@ -34,12 +38,13 @@ minTicksToNextBonus = 200
 maxTicksToNextBonus = 400
 
 
-type Update
+type Action
   = Arrows Point
   | Wasd Point
   | Tick Float
   | Space Bool
-  | StartTime Float
+  | Window (Int, Int)
+  | StartTime (Time)
 
 type Mode
   = NewGame
@@ -67,6 +72,7 @@ type alias Model =
   , bonus : Bonus
   , seed : Seed
   , score : Int
+  , window : (Int, Int)
   }
 
 
@@ -89,33 +95,43 @@ defaultGame =
   , bonus = defaultBonus
   , seed = Random.initialSeed 0
   , score = 0
+  , window = (0, 0)
   }
 
 
-initialGame : Update -> Model
-initialGame input =
-  case input of
-    StartTime time ->
-      { defaultGame | seed = Random.initialSeed (round time) }
-      |> newFood
-      |> resetBonus
-    _ -> defaultGame
+initialGame : (Model, Effects Action)
+initialGame =
+  ( defaultGame
+  , getStartTime
+  )
 
 
-updateGame : Update -> Model -> Model
+getStartTime : Effects Action
+getStartTime =
+  getCurrentTime
+  |> Task.map StartTime
+  |> Effects.task
+
+
+updateGame : Action -> Model -> (Model, Effects Action)
 updateGame input game =
-  case input of
+  ( case input of
     Arrows arrows -> { game | arrows = arrows }
     Wasd wasd -> { game | arrows = wasd }
     Tick _ -> tickGame game
     Space True -> changeGameMode game
+    Window (x, y) -> { game | window = (x, y) }
+    StartTime (time) -> { game | seed = Random.initialSeed (round time) }
     _ -> game
+  , Effects.none
+  )
 
 
 startGame : Model -> Model
 startGame game =
   { defaultGame
   | seed = game.seed
+  , window = game.window
   , mode = Play
   }
   |> newFood
