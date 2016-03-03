@@ -1,5 +1,5 @@
 module Snake
-  ( Update(..)
+  ( Action(..)
   , Mode(..)
   , Model
   , Point
@@ -12,10 +12,15 @@ module Snake
   , activeBonusTicks
   , getHead
   , getTail
+  , soundSignal
   ) where
 
 import Debug
+import Effects exposing (Effects)
 import Random exposing(Seed)
+import Task
+import TaskTutorial exposing (getCurrentTime)
+import Time exposing(Time)
 import Trampoline
 
 
@@ -30,16 +35,19 @@ deathTicks = 32
 deathFlashCount = deathTicks // 4
 
 activeBonusTicks = 50
+bonusBlipMod = 10
 minTicksToNextBonus = 200
 maxTicksToNextBonus = 400
 
 
-type Update
+type Action
   = Arrows Point
   | Wasd Point
   | Tick Float
   | Space Bool
-  | StartTime Float
+  | Window (Int, Int)
+  | StartTime (Time)
+  | Noop
 
 type Mode
   = NewGame
@@ -67,6 +75,8 @@ type alias Model =
   , bonus : Bonus
   , seed : Seed
   , score : Int
+  , window : (Int, Int)
+  , sounds : List String
   }
 
 
@@ -89,33 +99,57 @@ defaultGame =
   , bonus = defaultBonus
   , seed = Random.initialSeed 0
   , score = 0
+  , window = (0, 0)
+  , sounds = []
   }
 
 
-initialGame : Update -> Model
-initialGame input =
-  case input of
-    StartTime time ->
-      { defaultGame | seed = Random.initialSeed (round time) }
-      |> newFood
-      |> resetBonus
-    _ -> defaultGame
+initialGame : (Model, Effects Action)
+initialGame =
+  ( defaultGame
+  , getStartTime
+  )
 
 
-updateGame : Update -> Model -> Model
+getStartTime : Effects Action
+getStartTime =
+  getCurrentTime
+  |> Task.map StartTime
+  |> Effects.task
+
+
+updateGame : Action -> Model -> (Model, Effects Action)
 updateGame input game =
-  case input of
-    Arrows arrows -> { game | arrows = arrows }
-    Wasd wasd -> { game | arrows = wasd }
-    Tick _ -> tickGame game
-    Space True -> changeGameMode game
-    _ -> game
+  ( case input of
+      Arrows arrows -> { game | arrows = arrows }
+      Wasd wasd -> { game | arrows = wasd }
+      Tick _ -> tickGame game
+      Space True -> changeGameMode game
+      Window (x, y) -> { game | window = (x, y) }
+      StartTime (time) -> { game | seed = Random.initialSeed (round time) }
+      _ -> game
+  ) |> triggerSounds
+
+
+triggerSounds : Model -> (Model, Effects Action)
+triggerSounds game =
+  let sendSound =
+    (\sound ->
+      (Signal.send sounds.address sound)
+      |> Effects.task
+      |> Effects.map (always Noop)
+    )
+  in
+    ( { game | sounds = [] }
+      , Effects.batch (List.map sendSound game.sounds)
+    )
 
 
 startGame : Model -> Model
 startGame game =
   { defaultGame
   | seed = game.seed
+  , window = game.window
   , mode = Play
   }
   |> newFood
@@ -217,7 +251,10 @@ tickPlay game =
     head' = moveHead game direction'
   in
     if collisionTest head' game.snake then
-      { game | mode = Dead 0 }
+      { game
+      | mode = Dead 0
+      , sounds = "snake-died" :: game.sounds
+      }
     else
       { game
       | snake = head' :: game.snake
@@ -240,6 +277,7 @@ tickFood game =
       { game
       | length = game.length + foodEnergy
       , score = game.score + foodScore
+      , sounds = "food-eaten" :: game.sounds
       }
   else game
 
@@ -258,11 +296,25 @@ tickBonus game =
             { game
             | length = game.length + foodEnergy
             , score = game.score + bonusScore
+            , sounds = "bonus-eaten" :: game.sounds
             }
         else
           case bonus'.ticks of
             0 -> resetBonus game
-            _ -> { game | bonus = bonus' }
+            _ ->
+              let
+                sounds' =
+                  if game.bonus.ticks % bonusBlipMod == 0 then
+                    "bonus-tick-high" :: game.sounds
+                  else if game.bonus.ticks % bonusBlipMod == round (bonusBlipMod / 2) then
+                    "bonus-tick-low" :: game.sounds
+                  else
+                    game.sounds
+              in
+                { game
+                | bonus = bonus'
+                , sounds = sounds'
+                }
       Nothing ->
         case bonus'.ticks of
           0 -> newBonus game
@@ -332,3 +384,11 @@ changeDirection game =
       Down
     else
       game.direction
+
+
+sounds : Signal.Mailbox String
+sounds = Signal.mailbox ""
+
+
+soundSignal : Signal String
+soundSignal = sounds.signal
