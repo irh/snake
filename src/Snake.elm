@@ -35,6 +35,7 @@ deathTicks = 32
 deathFlashCount = deathTicks // 4
 
 activeBonusTicks = 50
+bonusBlipMod = 10
 minTicksToNextBonus = 200
 maxTicksToNextBonus = 400
 
@@ -300,7 +301,20 @@ tickBonus game =
         else
           case bonus'.ticks of
             0 -> resetBonus game
-            _ -> { game | bonus = bonus' }
+            _ ->
+              let
+                sounds' =
+                  if game.bonus.ticks % bonusBlipMod == 0 then
+                    "bonus-tick-high" :: game.sounds
+                  else if game.bonus.ticks % bonusBlipMod == round (bonusBlipMod / 2) then
+                    "bonus-tick-low" :: game.sounds
+                  else
+                    game.sounds
+              in
+                { game
+                | bonus = bonus'
+                , sounds = sounds'
+                }
       Nothing ->
         case bonus'.ticks of
           0 -> newBonus game
