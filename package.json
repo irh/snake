@@ -5,8 +5,11 @@
   "main": "elm.js",
   "dependencies": {},
   "devDependencies": {
+    "audiosprite": "^0.6.0",
     "gulp": "^3.9.0",
+    "gulp-audiosprite": "^1.0.3",
     "gulp-concat": "^2.6.0",
+    "gulp-concat-util": "^0.5.5",
     "gulp-elm": "^0.2.0",
     "gulp-jshint": "^2.0.0",
     "gulp-rename": "^1.2.2",

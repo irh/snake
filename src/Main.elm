@@ -1,9 +1,11 @@
 module Main (main) where
 
+import Effects
 import Keyboard
 import Primer
 import Snake
 import StartApp
+import Task
 import Time
 import View
 import Window
@@ -28,3 +30,10 @@ app =
 main =
   app.html
 
+port tasks : Signal (Task.Task Effects.Never ())
+port tasks =
+  app.tasks
+
+port playSound : Signal String
+port playSound =
+  Snake.soundSignal
