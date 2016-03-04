@@ -25,7 +25,6 @@ gulp.task('lint', function() {
 gulp.task('build', ['lint', 'elm-make'], function() {
   gulp.src(['build/*.js', 'src/*.js'])
     .pipe(concat('snake.js'))
-    .pipe(gulp.dest('dist/js'))
     .pipe(rename('snake.min.js'))
     .pipe(uglify())
     .pipe(gulp.dest('dist/js'));
